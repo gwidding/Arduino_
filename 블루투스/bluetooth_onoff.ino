@@ -1,0 +1,29 @@
+//블루투스 모듈 이용하여, 스마트폰으로부터 서보모터 각도 명령을 전달받아, 서보모터 회전 + OLED에 값 출력
+#include <SoftwareSerial.h>
+
+SoftwareSerial mySerial(2,3); //블루투스의 Tx, Rx핀을 2,3번 핀으로 설정
+
+void setup() {
+  Serial.begin(9600);
+  Serial.println("HM - 10 BLE");
+  mySerial.begin(9600); //블루투스의 시리얼 통신속도 설정
+  pinMode(13, OUTPUT);
+}
+
+void loop() {
+  byte input = 0;
+  if (mySerial.available()) { //블루투스에서 넘어온 데이터가 있다면
+    //Serial.println("kkkkkk");
+    input = mySerial.read(); //그 데이터 출력
+    Serial.write(input);
+    
+    if (input =='a') 
+      digitalWrite(13, HIGH);
+    else if (input == 'b') 
+      digitalWrite(13, LOW);
+  }
+  
+  if (Serial.available()) { //시리얼 모니터에 입력된 데이터가 있다면
+    mySerial.write(Serial.read()); //블루투스 통해 그 데이터 전달
+  }
+}
