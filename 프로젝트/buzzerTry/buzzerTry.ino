@@ -1,6 +1,6 @@
 const int VRX = A0; //조이스틱
 const int VRY = A1;
-const int SW = 2;
+//const int SW = 2;
 
 const int LED_U = 10; //위오아왼
 const int LED_R = 11;
@@ -29,12 +29,28 @@ const int numberCode[15] = {
                             B10100001, //E
                             B10001110 //F
                             };
+#include "pitches.h"
+int tempo = 105;
+int buzzer = 2;
+int melody[] = {
+  // Pacman
+  NOTE_B4, 16, NOTE_B5, 16, NOTE_FS5, 16, NOTE_DS5, 16, //1
+  NOTE_B5, 32, NOTE_FS5, -16, NOTE_DS5, 8, NOTE_C5, 16,
+  NOTE_C6, 16, NOTE_G6, 16, NOTE_E6, 16, NOTE_C6, 32, NOTE_G6, -16, NOTE_E6, 8,
+
+  NOTE_B4, 16,  NOTE_B5, 16,  NOTE_FS5, 16,   NOTE_DS5, 16,  NOTE_B5, 32,  //2
+  NOTE_FS5, -16, NOTE_DS5, 8,  NOTE_DS5, 32, NOTE_E5, 32,  NOTE_F5, 32,
+  NOTE_F5, 32,  NOTE_FS5, 32,  NOTE_G5, 32,  NOTE_G5, 32, NOTE_GS5, 32,  NOTE_A5, 16, NOTE_B5, 8
+};
+int notes = sizeof(melody) / sizeof(melody[0]) / 2;
+int wholenote = (60000 * 4) / tempo;
+int divider = 0, noteDuration = 0;
 
 int input_cnt = 0, level = 1, lifeN = 3; //1레벨, 목숨 3개로 시작, 목숨 0되면 죽음
 
 void setup() {
   Serial.begin(9600);
-  pinMode(SW, INPUT_PULLUP);
+  //pinMode(SW, INPUT_PULLUP);
   pinMode(LED_U, OUTPUT);
   pinMode(LED_R, OUTPUT);
   pinMode(LED_D, OUTPUT);
@@ -48,31 +64,35 @@ void setup() {
   randomSeed(analogRead(0));
   digitalWrite(GREEN, HIGH); //목숨 3으로 시작
   showScore(level);
+  sing();
 }
 
+
 void loop() {
-  int answer[level] = {}, response[level] ={};
-  for (int i = 0; i < 2; i++){
-    for (int j = 9; j < 13; j++){
-      ledOn(j, 50); //시작 의미로 반복
+  while (lifeN){
+    int answer[level] = {}, response[level] ={};
+    for (int i = 0; i < 2; i++){
+      for (int j = 9; j < 13; j++){
+        ledOn(j, 50); //시작 의미로 반복
+      }
     }
-  }
-  delay(500);
+    delay(500);
 
-  randQuestion(answer); //문제 난수 생성
-  inputJoy(response); //정답 입력
-  correctCheck(answer, response); //정답확인
+    randQuestion(answer); //문제 난수 생성
+    inputJoy(response); //정답 입력
+    correctCheck(answer, response); //정답확인
 
-  showScore(level);
-  
-  Serial.println(digitalRead(SW));
-  if (digitalRead(SW) == LOW){
-    level = 1;
-    lifeN = 3;
-    digitalWrite(RED, LOW);
-    digitalWrite(BLUE, LOW);
-    digitalWrite(GREEN, LOW);
-    digitalWrite(GREEN, HIGH);     
+    showScore(level);
+    
+    // Serial.println(digitalRead(SW));
+    // if (digitalRead(SW) == LOW){
+    //   level = 1;
+    //   lifeN = 3;
+    //   digitalWrite(RED, LOW);
+    //   digitalWrite(BLUE, LOW);
+    //   digitalWrite(GREEN, LOW);
+    //   digitalWrite(GREEN, HIGH);     
+    // }
   }
 }
 
@@ -146,16 +166,13 @@ void correctCheck(int ans[], int resp[]){
     if (ans[i] != resp[i]) {
       Serial.println("틀렸습니다");
       correct = false;
-      if (lifeN == 3) lifeN = 2;
-      
+      lifeN--;
       if(lifeN == 2){ //파랑
         digitalWrite(GREEN, LOW);
         digitalWrite(BLUE, HIGH);
-        lifeN = 1;
       }
       else if (lifeN == 1){ //자주
         digitalWrite(RED, HIGH);
-        lifeN = 0;
       }
       else if (lifeN == 0){ //빨강
         digitalWrite(BLUE, LOW);
@@ -175,5 +192,20 @@ void showScore(int num){ //num = 레벨
   for (int bitP = 0; bitP < 8; bitP++){ //세그먼트
     segmentBit = bitRead(numberCode[num], bitP); //해당 레벨 세그먼트 패턴 가져와서 넣음
     digitalWrite(pins[bitP], segmentBit); //해당하는 세그먼트 led 켜기
+  }
+}
+
+void sing(){
+  for (int thisNote = 0; thisNote < notes * 2; thisNote = thisNote + 2) {
+    divider = melody[thisNote + 1];
+    if (divider > 0) {
+      noteDuration = (wholenote) / divider;
+    } else if (divider < 0) {
+      noteDuration = (wholenote) / abs(divider);
+      noteDuration *= 1.5;
+    }
+    tone(buzzer, melody[thisNote], noteDuration * 0.9);
+    delay(noteDuration);
+    noTone(buzzer);
   }
 }
