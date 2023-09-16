@@ -6,7 +6,7 @@ volatile byte state = LOW;
 void setup() {
   pinMode(ledPin, OUTPUT);           //13핀을 LED 제어를 위해 출력으로 지정
   pinMode(interruptPin, INPUT);      //2핀을 인터럽트 핀으로 쓰기 위해 INPUT
-  attachInterrupt(0, blink, CHANGE); //인터럽트 생성 함수
+  attachInterrupt(0, blink, FALLING); //인터럽트 생성 함수
   //0:인터럽트 번호, blink:인터럽트 핸들러, change:핀의 레벨이 변하면 인터럽트 발생
 }
 
