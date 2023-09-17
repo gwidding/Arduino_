@@ -1,366 +1,397 @@
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>
-#include "Arduino.h"
+#include <TimerOne.h>
 #include "pitches.h"
 #include <EEPROM.h>
-
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-const int VRX = A0; 
-const int VRY = A1;
-const int SW = A2;
-const int buzzer = 12;
+const int xPin = A0;
+const int yPin = A1;
+const int zPin = 2;
 
 bool setMode = false;
 bool alarmMode = false;
-bool soundMode = false;
+bool melodyMode = false;
 
-unsigned long clickTime = 0;
-bool clicked = false;
-
-int melody_index = 0;
-
-int hour = 14;
+int hour = 11;
 int minute = 0;
 int second = 0;
 int alarmHour = 12;
 int alarmMinute = 0;
+int alarmSecond = 0;
+int melodyIndex = 0;
 
+unsigned long lastTime = 0;
+unsigned long currentTime = 0;
+unsigned long elapsedTime = 0;
+const unsigned long interval = 1000; // 1초마다 업데이트
 
-int melodyBear[] = {
-  NOTE_C5,NOTE_C5,NOTE_C5,NOTE_C5,NOTE_C5,
-  NOTE_E5,NOTE_G5,NOTE_G5,NOTE_E5,NOTE_C5,
-  NOTE_G5,NOTE_G5,NOTE_E5,NOTE_G5,NOTE_G5,NOTE_E5,
-  NOTE_C5,NOTE_C5,NOTE_C5,
+int melody1[] = {
+  REST, 2, NOTE_D4, 4,
+  NOTE_G4, -4, NOTE_AS4, 8, NOTE_A4, 4,
+  NOTE_G4, 2, NOTE_D5, 4,
+  NOTE_C5, -2, 
+  NOTE_A4, -2,
+  NOTE_G4, -4, NOTE_AS4, 8, NOTE_A4, 4,
+  NOTE_F4, 2, NOTE_GS4, 4,
+  NOTE_D4, -1, 
+  NOTE_D4, 4,
 
-  NOTE_G5,NOTE_G5,NOTE_E5,NOTE_C5,
-  NOTE_G5,NOTE_G5,NOTE_G5,
-  NOTE_G5,NOTE_G5,NOTE_E5,NOTE_C5,
-  NOTE_G5,NOTE_G5,NOTE_G5,
+  NOTE_G4, -4, NOTE_AS4, 8, NOTE_A4, 4, //10
+  NOTE_G4, 2, NOTE_D5, 4,
+  NOTE_F5, 2, NOTE_E5, 4,
+  NOTE_DS5, 2, NOTE_B4, 4,
+  NOTE_DS5, -4, NOTE_D5, 8, NOTE_CS5, 4,
+  NOTE_CS4, 2, NOTE_B4, 4,
+  NOTE_G4, -1,
+  NOTE_AS4, 4,
+     
+  NOTE_D5, 2, NOTE_AS4, 4,//18
+  NOTE_D5, 2, NOTE_AS4, 4,
+  NOTE_DS5, 2, NOTE_D5, 4,
+  NOTE_CS5, 2, NOTE_A4, 4,
+  NOTE_AS4, -4, NOTE_D5, 8, NOTE_CS5, 4,
+  NOTE_CS4, 2, NOTE_D4, 4,
+  NOTE_D5, -1, 
+  REST,4, NOTE_AS4,4,  
 
-  NOTE_G5,NOTE_G5,NOTE_E5,NOTE_C5,
-  NOTE_G5,NOTE_G5,NOTE_G5,NOTE_A5,NOTE_G5,
-  NOTE_C6,NOTE_G5,NOTE_C6,NOTE_G5,
-  NOTE_E5,NOTE_D5,NOTE_C5
-  };
-
-int noteDurationsBear[] = {
-  4, 8, 8, 4, 4,
-  4, 8, 8, 4, 4,
-  8, 8, 4, 8, 8, 4,
-  4, 4, 2,
-  4, 4, 4, 4,
-  4, 4, 2,
-  4, 4, 4, 4,
-  4, 4, 2,
-  4, 4, 4, 4,
-  8, 8, 8, 8, 2,
-  4, 4, 4, 4,
-  4, 4, 2
+  NOTE_D5, 2, NOTE_AS4, 4,//26
+  NOTE_D5, 2, NOTE_AS4, 4,
+  NOTE_F5, 2, NOTE_E5, 4,
+  NOTE_DS5, 2, NOTE_B4, 4,
+  NOTE_DS5, -4, NOTE_D5, 8, NOTE_CS5, 4,
+  NOTE_CS4, 2, NOTE_AS4, 4,
+  NOTE_G4, -1, 
 };
 
-int melodyHarry[] = {
-  REST, NOTE_D4, NOTE_G4, NOTE_AS4, NOTE_A4,
-  NOTE_G4, NOTE_D5, NOTE_C5, NOTE_A4,
-  NOTE_G4, NOTE_AS4, NOTE_A4, NOTE_F4, NOTE_GS4,
-  NOTE_D4, NOTE_D4, NOTE_G4, NOTE_AS4, NOTE_A4,
-  NOTE_G4, NOTE_D5, NOTE_F5, NOTE_E5, NOTE_DS5, NOTE_B4,
-  NOTE_DS5, NOTE_D5, NOTE_CS5, NOTE_CS4, NOTE_B4,
-  NOTE_G4, NOTE_AS4, NOTE_D5, NOTE_AS4, NOTE_D5, NOTE_AS4,
-  NOTE_DS5, NOTE_D5, NOTE_CS5, NOTE_A4, NOTE_AS4,
-  REST, NOTE_AS4, NOTE_D5, NOTE_AS4, NOTE_D5, NOTE_AS4,
-  NOTE_F5, NOTE_E5, NOTE_DS5, NOTE_B4,
-  NOTE_DS5, NOTE_D5, NOTE_CS5, NOTE_CS4, NOTE_AS4, NOTE_G4,
+
+int melody2[] = {
+  NOTE_C5,4, //1
+  NOTE_F5,4, NOTE_F5,8, NOTE_G5,8, NOTE_F5,8, NOTE_E5,8,
+  NOTE_D5,4, NOTE_D5,4, NOTE_D5,4,
+  NOTE_G5,4, NOTE_G5,8, NOTE_A5,8, NOTE_G5,8, NOTE_F5,8,
+  NOTE_E5,4, NOTE_C5,4, NOTE_C5,4,
+  NOTE_A5,4, NOTE_A5,8, NOTE_AS5,8, NOTE_A5,8, NOTE_G5,8,
+  NOTE_F5,4, NOTE_D5,4, NOTE_C5,8, NOTE_C5,8,
+  NOTE_D5,4, NOTE_G5,4, NOTE_E5,4,
+
+  NOTE_F5,2, NOTE_C5,4, //8 
+  NOTE_F5,4, NOTE_F5,8, NOTE_G5,8, NOTE_F5,8, NOTE_E5,8,
+  NOTE_D5,4, NOTE_D5,4, NOTE_D5,4,
+  NOTE_G5,4, NOTE_G5,8, NOTE_A5,8, NOTE_G5,8, NOTE_F5,8,
+  NOTE_E5,4, NOTE_C5,4, NOTE_C5,4,
+  NOTE_A5,4, NOTE_A5,8, NOTE_AS5,8, NOTE_A5,8, NOTE_G5,8,
+  NOTE_F5,4, NOTE_D5,4, NOTE_C5,8, NOTE_C5,8,
+  NOTE_D5,4, NOTE_G5,4, NOTE_E5,4,
+  NOTE_F5,2, NOTE_C5,4,
+
+  NOTE_F5,4, NOTE_F5,4, NOTE_F5,4,//17
+  NOTE_E5,2, NOTE_E5,4,
+  NOTE_F5,4, NOTE_E5,4, NOTE_D5,4,
+  NOTE_C5,2, NOTE_A5,4,
+  NOTE_AS5,4, NOTE_A5,4, NOTE_G5,4,
+  NOTE_C6,4, NOTE_C5,4, NOTE_C5,8, NOTE_C5,8,
+  NOTE_D5,4, NOTE_G5,4, NOTE_E5,4,
+  NOTE_F5,2, NOTE_C5,4, 
+  NOTE_F5,4, NOTE_F5,8, NOTE_G5,8, NOTE_F5,8, NOTE_E5,8,
+  NOTE_D5,4, NOTE_D5,4, NOTE_D5,4,
+  
+  NOTE_G5,4, NOTE_G5,8, NOTE_A5,8, NOTE_G5,8, NOTE_F5,8, //27
+  NOTE_E5,4, NOTE_C5,4, NOTE_C5,4,
+  NOTE_A5,4, NOTE_A5,8, NOTE_AS5,8, NOTE_A5,8, NOTE_G5,8,
+  NOTE_F5,4, NOTE_D5,4, NOTE_C5,8, NOTE_C5,8,
+  NOTE_D5,4, NOTE_G5,4, NOTE_E5,4,
+  NOTE_F5,2, NOTE_C5,4,
+  NOTE_F5,4, NOTE_F5,4, NOTE_F5,4,
+  NOTE_E5,2, NOTE_E5,4,
+  NOTE_F5,4, NOTE_E5,4, NOTE_D5,4,
+  
+  NOTE_C5,2, NOTE_A5,4,//36
+  NOTE_AS5,4, NOTE_A5,4, NOTE_G5,4,
+  NOTE_C6,4, NOTE_C5,4, NOTE_C5,8, NOTE_C5,8,
+  NOTE_D5,4, NOTE_G5,4, NOTE_E5,4,
+  NOTE_F5,2, NOTE_C5,4, 
+  NOTE_F5,4, NOTE_F5,8, NOTE_G5,8, NOTE_F5,8, NOTE_E5,8,
+  NOTE_D5,4, NOTE_D5,4, NOTE_D5,4,
+  NOTE_G5,4, NOTE_G5,8, NOTE_A5,8, NOTE_G5,8, NOTE_F5,8, 
+  NOTE_E5,4, NOTE_C5,4, NOTE_C5,4,
+  
+  NOTE_A5,4, NOTE_A5,8, NOTE_AS5,8, NOTE_A5,8, NOTE_G5,8,//45
+  NOTE_F5,4, NOTE_D5,4, NOTE_C5,8, NOTE_C5,8,
+  NOTE_D5,4, NOTE_G5,4, NOTE_E5,4,
+  NOTE_F5,2, NOTE_C5,4,
+  NOTE_F5,4, NOTE_F5,8, NOTE_G5,8, NOTE_F5,8, NOTE_E5,8,
+  NOTE_D5,4, NOTE_D5,4, NOTE_D5,4,
+  NOTE_G5,4, NOTE_G5,8, NOTE_A5,8, NOTE_G5,8, NOTE_F5,8,
+  NOTE_E5,4, NOTE_C5,4, NOTE_C5,4,
+  
+  NOTE_A5,4, NOTE_A5,8, NOTE_AS5,8, NOTE_A5,8, NOTE_G5,8, //53
+  NOTE_F5,4, NOTE_D5,4, NOTE_C5,8, NOTE_C5,8,
+  NOTE_D5,4, NOTE_G5,4, NOTE_E5,4,
+  NOTE_F5,2, REST,4
 };
 
-int noteDurationsHarry[] = {
-  2, 4, -4, 8, 4,
-  2, 4, -2, -2,
-  -4, 8, 4, 2, 4,
-  -1, 4, -4, 8, 4,
-  2, 4, 2, 4, 2, 4,
-  -4, 8, 4, 2, 4, -1,
+int* melodyList[] = {melody1, melody2};
+int* selectedMelody;
 
-  2, 4, 2, 4, 2, 4,
-  2, 4, -4, 8, 4, 2, 4,
-  -1, 4, 2, 4, 2, 4,
-  2, 4, 2, 4, -4, 8, 4,
-  2, 4, -1, 4, 2, 4,
-  2, 4, 2, 4, 2, 4,
-  -4, 8, 4, 2, 4,
-  -1, 4,
+char input = ' ';
 
-  2, 4, 2, 4, 2, 4,
-  2, 4, -4, 8, 4,
-  2, 4, -1, 4
-};
+bool zPressed = false;
+unsigned long zPressTime = 0;
 
+int switchState = HIGH;  // 현재 스위치 상태
+int lastSwitchState = HIGH;  // 이전 스위치 상태
+unsigned long lastDebounceTime = 0;  // 디바운싱을 위한 시간 기록
+unsigned long debounceDelay = 50;
 
 void setup() {
-  Wire.begin();
-  lcd.init();
-  lcd.backlight();
-  pinMode(buzzer, OUTPUT);
-  Serial.begin(9600);
+ lcd.init();
+ lcd.backlight();
+ Serial.begin(9600);
+ Timer1.initialize(1000000);
+ Timer1.attachInterrupt(sec);
+//loadSettings();
 }
 
 void loop() {
-  lcd.setCursor(0, 0);
-  lcd.print("Alarm ");
-  printZero(alarmHour);
-  lcd.print(":");
-  printZero(alarmMinute);
+  int reading = digitalRead(zPin);
+  currentTime = millis();
+  elapsedTime = currentTime - lastTime; // 경과시간
 
-  if (hour == 24) {
-    hour = 0;
+  if (elapsedTime >= interval) {
+    lastTime = currentTime;
+    // updateClock();
   }
-  if (second == 59) {
-    minute++;
-    second = 0;
-  }
-  if (minute == 59) {
-    hour++;
-    minute = 0;
-  }
+  Serial.println(digitalRead(zPin));
 
-  int x = analogRead(VRX);
-  int y = analogRead(VRY); 
-  int z = digitalRead(SW);
-  Serial.print(x); // x의 값을 출력
-  Serial.print(" "); // 공백 문자열을 출력
-  Serial.print(y); // y의 값을 출력
-  Serial.print(" "); // 공백 문자열을 출력
-  Serial.println(z); // z의 값을 출력하고 줄 바꿈
-
-  // if (z == LOW && !clicked) {
-  //   unsigned long currentMillis = millis();
-  //   if (currentMillis - clickTime < 500) {
-  //     clicked = true;
-  //     soundMode = true;
-  //   }
-  //   clickTime = currentMillis;
-  // }
-  // if (z == HIGH) {
-  //   clicked = false;
-  // }
-
-  // if (z == LOW) {
-  //   setMode = true;
-  // }
-
-  if (setMode) {
-    settingTime(hour, minute, second);    
+  if (digitalRead(zPin) == LOW) {
+    setMode = true;
+    alarmMode = false;
+    melodyMode = false;
+    Serial.println("시간 설정 모드 시작");
   }
-  else if (alarmMode) {
-    settingAlarm(alarmHour, alarmMinute);
+  else if (digitalRead(zPin) && !zPressed) {
+    unsigned long currentMillis = millis();
+    if (currentMillis - zPressTime < 300) {
+      if (!setMode) {
+        alarmMode = !alarmMode;
+        Serial.print("알람 모드 : ");
+        Serial.println(alarmMode);
+      }
+    }
+    else if (currentMillis - zPressTime >= 3000) {
+      if (!setMode && !alarmMode) {
+        melodyMode = !melodyMode;
+        Serial.print("멜로디 선택 모드 : ");
+        Serial.println(melodyMode);
+      }
+    }
+    zPressTime = currentMillis;
+    zPressed = true;
   }
-  else if (soundMode) {
-    settingSound();
-  }
-  else {
-    printTime();
-  }
+    else if (digitalRead(zPin) == HIGH) {
+      zPressed = false;
+    } 
 
-  if (z == LOW) {
-    saveTime();  
-    setMode = false;  
+  if (hour == alarmHour && minute == alarmMinute && second == alarmSecond) {
+    playMelody();
   }
-
-  second++;
-  delay(1000);
-  lcd.clear();
+  saveTime();
 }
 
-
-void ampm_check (int &hour) {
-  if (hour >= 12)
-    lcd.print("PM ");
+void playMelody() {
+  int notes;
+  if (melodyIndex == 1)
+    notes = sizeof(melody1) / sizeof(selectedMelody[0]) / 2;
   else
-    lcd.print("AM ");
-  hour = hour % 24;
-}
-
-void printZero(int time) {
-  if (time < 10) {
-    lcd.print("0");
-  }
-  lcd.print(time);
-}
-
-void alarmTime(int alarmHour, int alarmMinute, int melody_index) {
-  if (alarmHour == hour && alarmMinute == minute) {
-    if (melody_index == 0) {
-      playMelody(melodyBear, noteDurationsBear);
+    notes = sizeof(melody2) / sizeof(selectedMelody[0]) / 2;
+  int wholenote = (60000 * 4) / 144;
+  int divider = 0, noteDuration = 0;
+  for (int i = 0; i < notes * 2; i = i + 2) {
+    Serial.println("알람시간입니다!!");
+    divider = selectedMelody[i+1];
+    if (divider > 0) {
+      noteDuration = (wholenote) / divider;
+    } else if (divider < 0) {
+      noteDuration = (wholenote) / abs(divider);
+      noteDuration *= 1.5;
     }
-    else if (melody_index == 1) {
-      playMelody(melodyHarry, noteDurationsHarry);
-    }
-  }
-}
+    tone(11, selectedMelody[i], noteDuration*0.9);
+    delay(noteDuration);
+    noTone(11);
 
-void playMelody(int *melody, int *noteDurations) {
-  for (int i = 0; i < sizeof(melody); i++) {
-    int Durations = 1000 / noteDurations[i];
-    tone(buzzer, melody[i], Durations);
-
-    if (digitalRead(SW) == LOW) {
-      noTone(buzzer);
+    int z = digitalRead(zPin);
+    if (z == LOW) {
+      Serial.println("알람을 끕니다.");
       break;
     }
-
-    delay(Durations * 1.3);
-    noTone(buzzer);
   }
+  delay(500);
 }
 
-void modeSwitch() {
-  static unsigned long lastSwitchTime = 0;
-  const int z = digitalRead(SW);
-
-  if (z == LOW) {
-    unsigned long currentTime = millis();
-
-    if (currentTime - lastSwitchTime > 3000) {
-      alarmMode = true;      
-    }
-    else if (!setMode && !alarmMode && !soundMode) {
-      setMode = true; // 처음 누른 경우
-    }
-
-    lastSwitchTime = currentTime;
-    delay(500); // 디바운스
-  }
-}
-
-void settingTime(int &hour, int &minute, int &second) {
-  static unsigned long blinkMillis = 0;
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - blinkMillis >= 500) { // 0.5초마다 깜빡이게
-    blinkMillis = currentMillis;
-    
-    int y = analogRead(VRY);
-    if (y < 100) {
-      hour++;
-    }
-    else if (y > 900) {
-      hour--;
-    }
-    twentyfourMax(hour);
-
-    int x = analogRead(VRX);
-
-    if (x > 900) {
-      if (y < 100) {
-        minute++;
-      }
-      else if (y > 900) {
-        minute--;
-      }
-      sixtyMax(minute);
-
-      if (x > 900) {
-        if (y < 100) {
-          second++;
-        }
-        else if (y > 900) {
-          second--;
-        }
-        sixtyMax(second);
-
-        if (x > 900) {
-          setMode = false;
-        }
-
-      }
-    }
-
-  }
-
-}
-
-void settingAlarm(int &alarmHour, int &alarmMinute) {
-  static unsigned long blinkMillis = 0;
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - blinkMillis >= 500) { // 0.5초마다 깜빡이게
-    blinkMillis = currentMillis;
-    
-    int y = analogRead(VRY);
-
-    if (y < 100) {
-      alarmHour++;
-    }
-    else if (y > 900) {
-      alarmHour--;
-    }
-    twentyfourMax(hour);
-
-    int x = analogRead(VRX);
-
-    if (x > 900) {
-      if (y < 100) {
-        alarmMinute++;
-      }
-      else if (y > 900) {
-        alarmMinute--;
-      }
-      sixtyMax(minute);
-    } 
-  }
-
-}
-
-void settingSound() {
-  int y = analogRead(VRY);
-  if (y < 100) {
-    melody_index = 0;
-  }
-  else if (y > 900) {
-    melody_index = 1;
-  }
-  saveSound();
-}
-
-void twentyfourMax(int &hour) {
-  if (hour < 0) {
-    hour = 23;
-  }
-  else if (hour > 23) {
-    hour = 0;
-  }
-}
-
-void sixtyMax(int &time) {
-  if (time < 0) {
-    time = 59;
-  }
-  else if (time > 59) {
-    time = 0;
+void sec() {
+  if (!setMode) {
+    second++;
   }
 }
 
 void printTime() {
-  lcd.setCursor(0, 1);
-  ampm_check(hour);
-  printZero(hour);
+  lcd.setCursor(0, 0);
+  if (hour >= 12)
+    lcd.print("PM ");
+  else
+    lcd.print("AM ");
+  if (hour < 10)
+    lcd.print(0);
+  lcd.print(hour);
   lcd.print(":");
-  printZero(minute);
+  if (minute < 10)
+    lcd.print(0);
+  lcd.print(minute);
   lcd.print(":");
-  printZero(second);
-}
+  if (second < 10)
+    lcd.print(0);
+  lcd.print(second);
 
+  lcd.setCursor(0,1);
+  lcd.print("Alarm ");
+  if (alarmHour >= 12)
+    lcd.print("PM ");
+  else
+    lcd.print("AM ");
+  if (alarmHour < 10)
+    lcd.print(0);
+  lcd.print(alarmHour);
+  lcd.print(":");
+  if (alarmMinute < 10)
+    lcd.print(0);
+  lcd.print(alarmMinute);
+}
 
 void saveTime() {
   EEPROM.put(0, hour);
   EEPROM.put(sizeof(int), minute);
   EEPROM.put(sizeof(int)*2 , second);
-}
-
-void saveAlarm() {
   EEPROM.put(sizeof(int) * 3, alarmHour);
   EEPROM.put(sizeof(int) * 4, alarmMinute);
+  
 }
 
 void saveSound() {
-  EEPROM.put(sizeof(int) * 5, melody_index);
+  EEPROM.put(sizeof(int) * 5, melodyIndex);
+}
+
+void setTimeJoystick() {
+  int x = analogRead(xPin);
+  int y = analogRead(yPin);
+  int z = digitalRead(zPin);
+
+  if (setMode) {
+    static int setStep = 0;
+    constrain(setStep, 0, 2);
+    if (y < 100) {
+      if (setStep == 0) {
+        hour = (hour + 1) % 24;
+      }
+      else if (setStep == 1) {
+        minute = (minute + 1) % 60;
+      }
+      else if (setStep == 2) {
+        second = (second + 1) % 60;
+      }
+      delay(300);
+    }
+
+    if (y > 900) {
+      if (setStep == 0) {
+        hour = (hour + 23) % 24;
+      }
+      else if (setStep == 1) {
+        minute = (minute + 59) % 60;
+      }
+      else if (setStep == 2) {
+        second = (second + 59) % 60;
+      }
+      delay(300);
+    }
+
+    if (x > 900) {
+      setStep++;
+      delay(300);
+    }
+    if (x < 100) {
+      setStep--;
+      delay(300);
+    }
+    if (z == LOW) {
+      setMode = false;
+    }
+    printTime();
+  } 
+  else if (alarmMode) {
+    static int setStep = 0;
+    constrain(setStep, 0, 2);
+
+    if (y < 100) {
+      if (setStep == 0) {
+        alarmHour = (alarmHour + 1) % 24;
+      }
+      else if (setStep == 1) {
+        alarmMinute = (alarmMinute + 1) % 60;
+      }
+      else if (setStep == 2) {
+        alarmSecond = (alarmSecond + 1) % 60;
+      }
+      delay(300);
+    }
+
+    if (y > 900) {
+      if (setStep == 0) {
+        alarmHour = (alarmHour + 23) % 24;
+      }
+      else if (setStep == 1) {
+        alarmMinute = (alarmMinute + 59) % 60;
+      }
+      else if (setStep == 2) {
+        alarmSecond = (alarmSecond + 59) % 60;
+      }
+      delay(300);
+    }
+
+    if (x > 900) {
+      setStep++;
+      delay(300);
+    }
+    if (x < 100) {
+      setStep--;
+      delay(300);
+    }
+    if (z == LOW) {
+      alarmMode = false;
+    }
+    printTime();
+  }
+  else if(melodyMode) {
+    if (y < 100) {
+      selectedMelody = melodyList[0];
+      melodyIndex = 1;
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Harry Potter");
+      Serial.println("멜로디 선택 완료1");
+      melodyMode = false;
+      lcd.clear();
+    }
+    if (y > 900) {
+      selectedMelody = melodyList[1];
+      melodyIndex = 2;
+      lcd.print("Merry Christmas");
+      Serial.println("멜로디 선택 완료2");
+      melodyMode = false;
+      lcd.clear();
+    }
+    saveSound();
+  }
+  else {
+    printTime();
+  }
 }
