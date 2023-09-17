@@ -125,6 +125,9 @@ int melody2[] = {
 int* melodyList[] = {melody1, melody2};
 int* selectedMelody = melodyList[0];
 
+int timeStep = 0;
+int alarmStep = 0;
+
 char input = ' ';
 
 void setup() {
@@ -143,146 +146,99 @@ void loop() {
   
   if (Serial.available()) {
     input = Serial.read();
-    Serial.print("input = ");
-    Serial.println(input);
-    handleInput(input);
 
     if (input == 'z') {
       setMode = !setMode;
       alarmMode = false;
       melodyMode = false;
-      Serial.println(setMode);
     }
     else if (input == 'x') {
      alarmMode = !alarmMode;
      setMode = false;
      melodyMode = false;
-     Serial.println(alarmMode);
     }
     else if (input == 'c') {
       setMode = false;
       alarmMode = false;
       melodyMode = !melodyMode;
       lcd.clear();
-      Serial.println(melodyMode);
     }
   }
 
   if (setMode) {
-    static int setStep = 0;
-    setStep = constrain(setStep, 0, 2);
+    timeStep %= 3;
 
-    if (setStep == 0) {
+    if (timeStep == 0) {
       lcd.setCursor(3,0);
       lcd.print("  ");
-      delay(300);
+      delay(200);
     }
-    else if (setStep == 1) {
+    else if (timeStep == 1) {
       lcd.setCursor(6,0);
       lcd.print("  ");
-      delay(300);
+      delay(200);
     }
     else {
       lcd.setCursor(9,0);
       lcd.print("  ");
-      delay(300);
+      delay(200);
     }
     if (input == 'w') {
-      if (setStep == 0) {
-        hour = (hour + 1) % 24;
-      }
-      else if (setStep == 1) {
-        minute = (minute + 1) % 60;
-      }
-      else if (setStep == 2) {
-        second = (second + 1) % 60;
-      }
+      if (timeStep == 0) hour = (hour + 1) % 24;
+      else if (timeStep == 1) minute = (minute + 1) % 60;
+      else if (timeStep == 2) second = (second + 1) % 60;
     }
     if (input == 's') {
-      if (setStep == 0) {
-        hour = (hour + 23) % 24;
-      }
-      else if (setStep == 1) {
-        minute = (minute + 59) % 60;
-      }
-      else if (setStep == 2) {
-        second = (second + 59) % 60;
-      }
+      if (timeStep == 0) hour = (hour + 23) % 24;
+      else if (timeStep == 1) minute = (minute + 59) % 60;
+      else if (timeStep == 2) second = (second + 59) % 60;
     }
-    if (input == 'd') {
-      setStep++;
-      Serial.println(setStep);
-    }
-    if (input == 'a') {
-      setStep--;
-      Serial.println(setStep);
-    }
+    if (input == 'd') timeStep++;
+    if (input == 'a') timeStep--;
+    
     printTime();
-    delay(300);
+    delay(200);
     saveTime();
   }
   else if (alarmMode) {
     static int setStep = 0;
-    setStep = constrain(setStep, 0, 1);
-    if (setStep == 0) {
+    alarmStep %= 2;
+
+    if (alarmStep == 0) {
       lcd.setCursor(9,1);
       lcd.print("  ");
-      delay(300);
+      delay(100);
     }
-    else if (setStep == 1) {
+    else if (alarmStep == 1) {
       lcd.setCursor(12,1);
       lcd.print("  ");
-      delay(300);
+      delay(100);
     }
 
     if (input == 'w') {
-      if (setStep == 0) {
-        alarmHour = (alarmHour + 1) % 24;
-      }
-      else if (setStep == 1) {
-        alarmMinute = (alarmMinute + 1) % 60;
-      }
-      delay(300);
+      if (alarmStep == 0) alarmHour = (alarmHour + 1) % 24;
+      else if (alarmStep == 1) alarmMinute = (alarmMinute + 1) % 60;
     }
     if (input == 's') {
-      if (setStep == 0) {
-        alarmHour = (alarmHour + 23) % 24;
-      }
-      else if (setStep == 1) {
-        alarmMinute = (alarmMinute + 59) % 60;
-      }
-      delay(300);
+      if (alarmStep == 0) alarmHour = (alarmHour + 23) % 24;
+      else if (alarmStep == 1) alarmMinute = (alarmMinute + 59) % 60;
     }
-    if (input == 'd') {
-      setStep++;
-      Serial.println(setStep);
-      delay(300);
-    }
-    if (input == 'a') {
-      setStep--;
-      Serial.println(setStep);
-      delay(300);
-    }
+    if (input == 'd') alarmStep++;
+    if (input == 'a') alarmStep--;
 
     printTime();
-    delay(300);
+    delay(200);
     saveTime();
   }
   else if (melodyMode) {
     lcd.setCursor(0,0);
-    if (melodyIndex > 1) {
-      melodyIndex = 0;
-    }
-    else if (melodyIndex < 0) {
-      melodyIndex = 1;
-    }
+    lcd.print("Melody : ");
+    lcd.setCursor(0,1);
+    melodyIndex %= 2;
 
-    if (input == 'w') {
-      melodyIndex++;
-    }
-    else if (input == 's') {
-      melodyIndex--;
-    }
+    if (input == 'w') melodyIndex++;
+    else if (input == 's') melodyIndex--;
+
     if (melodyIndex == 1) {
       selectedMelody = melodyList[0];
       lcd.print("Harry Potter");
@@ -314,10 +270,9 @@ void playMelody() {
     notes = sizeof(melody1) / sizeof(melody1[0]) / 2;
   else
     notes = sizeof(melody2) / sizeof(melody2[0]) / 2;
-  int wholenote = (60000 * 4) / 150;
+  int wholenote = (60000 * 4) / 160;
   int divider = 0, noteDuration = 0;
   for (int i = 0; i < notes * 2; i = i + 2) {
-    Serial.println("알람시간입니다!!");
     divider = selectedMelody[i+1];
     if (divider > 0) {
       noteDuration = (wholenote) / divider;
@@ -332,7 +287,6 @@ void playMelody() {
     if (Serial.available()) {
       input = Serial.read();
       if (input == 's') {
-        Serial.println("알람을 끕니다.");
         break;
       }
     }
@@ -343,18 +297,20 @@ void playMelody() {
 }
 
 void sec() {
-  if (!setMode)
-    second++;
+  if (!setMode) second++;
 }
 
 void printTime() {
   lcd.setCursor(0, 0);
-  if (hour >= 12)
+  if (hour >= 12){
     lcd.print("PM ");
-  else
+    if (hour >= 13 && hour <= 21) lcd.print("0");
+  }
+  else {
     lcd.print("AM ");
-  lcd.print(hour < 10 ? "0" : "");
-  lcd.print(hour);
+    if (hour < 10) lcd.print("0");
+  }
+  lcd.print(hour <= 12 ? hour : hour - 12);
   lcd.print(":");
   lcd.print(minute < 10 ? "0" : "");
   lcd.print(minute);
@@ -364,16 +320,17 @@ void printTime() {
 
   lcd.setCursor(0,1);
   lcd.print("Alarm ");
-  if (alarmHour >= 12)
+  if (alarmHour >= 12){
     lcd.print("PM ");
-  else
+    if (alarmHour >= 13 && alarmHour <= 21) lcd.print("0");
+  }
+  else {
     lcd.print("AM ");
-  if (alarmHour < 10)
-    lcd.print(0);
-  lcd.print(alarmHour);
+    if (alarmHour < 10) lcd.print("0");
+  }
+  lcd.print(alarmHour <= 12 ? alarmHour : alarmHour - 12);
   lcd.print(":");
-  if (alarmMinute < 10)
-    lcd.print(0);
+  lcd.print(alarmMinute < 10 ? "0" : "");
   lcd.print(alarmMinute);
 }
 
