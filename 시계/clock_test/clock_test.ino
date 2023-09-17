@@ -317,6 +317,7 @@ void printTime() {
   lcd.print(":");
   lcd.print(second < 10 ? "0" : "");
   lcd.print(second);
+  lcd.print("");
 
   lcd.setCursor(0,1);
   lcd.print("Alarm ");
