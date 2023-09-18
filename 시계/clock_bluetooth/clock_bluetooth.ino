@@ -208,7 +208,6 @@ void loop() {
     saveTime();
   }
   else if (alarmMode) {
-    static int setStep = 0;
     alarmStep %= 2;
 
     if (alarmStep == 0) {
@@ -324,7 +323,6 @@ void printTime() {
   lcd.print(":");
   lcd.print(second < 10 ? "0" : "");
   lcd.print(second);
-  lcd.print("");
 
   lcd.setCursor(0,1);
   lcd.print("Alarm ");
@@ -340,6 +338,8 @@ void printTime() {
   lcd.print(":");
   lcd.print(alarmMinute < 10 ? "0" : "");
   lcd.print(alarmMinute);
+  lcd.setCursor(11,0);
+  lcd.print(" ");
 }
 
 void saveTime() {

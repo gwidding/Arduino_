@@ -6,7 +6,7 @@
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 const int xPin = A0;
 const int yPin = A1;
-const int zPin = 2;
+const int zPin = 8;
 
 bool setMode = false;
 bool alarmMode = false;
@@ -18,7 +18,7 @@ int second = 0;
 int alarmHour = 12;
 int alarmMinute = 0;
 int alarmSecond = 0;
-int melodyIndex = 0;
+unsigned int melodyIndex = 0;
 
 unsigned long lastTime = 0;
 unsigned long currentTime = 0;
@@ -131,8 +131,10 @@ int melody2[] = {
 };
 
 int* melodyList[] = {melody1, melody2};
-int* selectedMelody;
+int* selectedMelody = melodyList[0];
 
+unsigned int timeStep = 0;
+unsigned int alarmStep = 0;
 char input = ' ';
 
 bool zPressed = false;
@@ -144,24 +146,21 @@ unsigned long lastDebounceTime = 0;  // 디바운싱을 위한 시간 기록
 unsigned long debounceDelay = 50;
 
 void setup() {
- lcd.init();
- lcd.backlight();
- Serial.begin(9600);
- Timer1.initialize(1000000);
- Timer1.attachInterrupt(sec);
-//loadSettings();
+  lcd.init();
+  lcd.backlight();
+  Serial.begin(9600);
+  Timer1.initialize(1000000);
+  Timer1.attachInterrupt(sec);
+  pinMode(zPin,INPUT_PULLUP);
+  loadSettings();
 }
 
 void loop() {
+  if (hour >= 24) hour = 0;
+  if (second >= 60) { minute++; second = 0; }
+  if (minute >= 60) { hour++; minute = 0; }
   int reading = digitalRead(zPin);
-  currentTime = millis();
-  elapsedTime = currentTime - lastTime; // 경과시간
-
-  if (elapsedTime >= interval) {
-    lastTime = currentTime;
-    // updateClock();
-  }
-  Serial.println(digitalRead(zPin));
+  Serial.println(reading);
 
   if (digitalRead(zPin) == LOW) {
     setMode = true;
@@ -169,7 +168,7 @@ void loop() {
     melodyMode = false;
     Serial.println("시간 설정 모드 시작");
   }
-  else if (digitalRead(zPin) && !zPressed) {
+  else if (digitalRead(zPin) == LOW && !zPressed) {
     unsigned long currentMillis = millis();
     if (currentMillis - zPressTime < 300) {
       if (!setMode) {
@@ -195,19 +194,19 @@ void loop() {
   if (hour == alarmHour && minute == alarmMinute && second == alarmSecond) {
     playMelody();
   }
+  setTimeJoystick();
   saveTime();
 }
 
 void playMelody() {
   int notes;
   if (melodyIndex == 1)
-    notes = sizeof(melody1) / sizeof(selectedMelody[0]) / 2;
+    notes = sizeof(melody1) / sizeof(melody1[0]) / 2;
   else
-    notes = sizeof(melody2) / sizeof(selectedMelody[0]) / 2;
-  int wholenote = (60000 * 4) / 144;
+    notes = sizeof(melody2) / sizeof(melody2[0]) / 2;
+  int wholenote = (60000 * 4) / 160;
   int divider = 0, noteDuration = 0;
   for (int i = 0; i < notes * 2; i = i + 2) {
-    Serial.println("알람시간입니다!!");
     divider = selectedMelody[i+1];
     if (divider > 0) {
       noteDuration = (wholenote) / divider;
@@ -219,52 +218,160 @@ void playMelody() {
     delay(noteDuration);
     noTone(11);
 
-    int z = digitalRead(zPin);
-    if (z == LOW) {
-      Serial.println("알람을 끕니다.");
-      break;
-    }
+    if (digitalRead(zPin) == LOW) 
+        break;
+    printTime();
   }
+  
   delay(500);
 }
 
 void sec() {
-  if (!setMode) {
-    second++;
-  }
+  if (!setMode) second++;
 }
+
 
 void printTime() {
   lcd.setCursor(0, 0);
-  if (hour >= 12)
+  if (hour >= 12){
     lcd.print("PM ");
-  else
+    if (hour >= 13 && hour <= 21) lcd.print("0");
+  }
+  else {
     lcd.print("AM ");
-  if (hour < 10)
-    lcd.print(0);
-  lcd.print(hour);
+    if (hour < 10) lcd.print("0");
+  }
+  lcd.print(hour <= 12 ? hour : hour - 12);
   lcd.print(":");
-  if (minute < 10)
-    lcd.print(0);
+  lcd.print(minute < 10 ? "0" : "");
   lcd.print(minute);
   lcd.print(":");
-  if (second < 10)
-    lcd.print(0);
+  lcd.print(second < 10 ? "0" : "");
   lcd.print(second);
+  lcd.setCursor(11,0);
+  lcd.print(" ");
 
   lcd.setCursor(0,1);
   lcd.print("Alarm ");
-  if (alarmHour >= 12)
+  if (alarmHour >= 12){
     lcd.print("PM ");
-  else
+    if (alarmHour >= 13 && alarmHour <= 21) lcd.print("0");
+  }
+  else {
     lcd.print("AM ");
-  if (alarmHour < 10)
-    lcd.print(0);
-  lcd.print(alarmHour);
+    if (alarmHour < 10) lcd.print("0");
+  }
+  lcd.print(alarmHour <= 12 ? alarmHour : alarmHour - 12);
   lcd.print(":");
-  if (alarmMinute < 10)
-    lcd.print(0);
+  lcd.print(alarmMinute < 10 ? "0" : "");
   lcd.print(alarmMinute);
+}
+
+void setTimeJoystick() {
+  int x = analogRead(xPin);
+  int y = analogRead(yPin);
+  int z = digitalRead(zPin);
+
+  if (setMode) {
+    timeStep %= 3;
+     if (timeStep == 0) {
+      lcd.setCursor(3,0);
+      lcd.print("  ");
+      delay(200);
+    }
+    else if (timeStep == 1) {
+      lcd.setCursor(6,0);
+      lcd.print("  ");
+      delay(200);
+    }
+    else {
+      lcd.setCursor(9,0);
+      lcd.print("  ");
+      delay(200);
+    }
+
+    if (y < 100) {
+      if (timeStep == 0) hour = (hour + 1) % 24;
+      else if (timeStep == 1) minute = (minute + 1) % 60;
+      else if (timeStep == 2) second = (second + 1) % 60;
+    }
+
+    if (y > 900) {
+      if (timeStep == 0) hour = (hour + 23) % 24;
+      else if (timeStep == 1) minute = (minute + 59) % 60;
+      else if (timeStep == 2) second = (second + 59) % 60;
+    }
+
+    if (x > 900) timeStep++;
+    if (x < 100) timeStep--;
+    if ( digitalRead(zPin) == LOW) {
+      setMode = false;
+      Serial.println("시간 설정 끝");
+    }
+    printTime();
+    delay(200);
+  }
+  else if (alarmMode) {
+    alarmStep %= 2;
+    delay(500);
+
+    if (alarmStep == 0) {
+      lcd.setCursor(9,1);
+      lcd.print("  ");
+      delay(100);
+    }
+    else if (alarmStep == 1) {
+      lcd.setCursor(12,1);
+      lcd.print("  ");
+      delay(100);
+    }
+
+    if (y < 100) {
+      if (alarmStep == 0) alarmHour = (alarmHour + 1) % 24;
+      else if (alarmStep == 1) alarmMinute = (alarmMinute + 1) % 60;
+    }
+
+    if (y > 900) {
+      if (alarmStep == 0) alarmHour = (alarmHour + 23) % 24;
+      else if (alarmStep == 1) alarmMinute = (alarmMinute + 59) % 60;
+    }
+
+    if (x > 900) alarmStep++;
+    if (x < 100) alarmStep--;
+    if (z == LOW) alarmMode = false;
+    printTime();
+    delay(200);
+    saveTime();
+  }
+  else if (melodyMode) {
+    lcd.setCursor(0,0);
+    lcd.print("Melody : ");
+    lcd.setCursor(0,1);
+
+    if (y < 100) melodyIndex++;
+    else if (y > 900) melodyIndex--;
+
+    melodyIndex %= 2;
+    Serial.print("melodyIndex");
+    Serial.println(melodyIndex);
+
+    if (melodyIndex == 1) {
+      selectedMelody = melodyList[0];
+      lcd.print("Harry Potter");
+      delay(500);
+      lcd.clear();
+    }
+    else {
+      lcd.print("Merry Christmas");
+      selectedMelody = melodyList[1];
+      delay(500);
+      lcd.clear();
+    }
+    saveSound();
+  }
+  else {
+    printTime();
+  }
 }
 
 void saveTime() {
@@ -280,118 +387,11 @@ void saveSound() {
   EEPROM.put(sizeof(int) * 5, melodyIndex);
 }
 
-void setTimeJoystick() {
-  int x = analogRead(xPin);
-  int y = analogRead(yPin);
-  int z = digitalRead(zPin);
-
-  if (setMode) {
-    static int setStep = 0;
-    constrain(setStep, 0, 2);
-    if (y < 100) {
-      if (setStep == 0) {
-        hour = (hour + 1) % 24;
-      }
-      else if (setStep == 1) {
-        minute = (minute + 1) % 60;
-      }
-      else if (setStep == 2) {
-        second = (second + 1) % 60;
-      }
-      delay(300);
-    }
-
-    if (y > 900) {
-      if (setStep == 0) {
-        hour = (hour + 23) % 24;
-      }
-      else if (setStep == 1) {
-        minute = (minute + 59) % 60;
-      }
-      else if (setStep == 2) {
-        second = (second + 59) % 60;
-      }
-      delay(300);
-    }
-
-    if (x > 900) {
-      setStep++;
-      delay(300);
-    }
-    if (x < 100) {
-      setStep--;
-      delay(300);
-    }
-    if (z == LOW) {
-      setMode = false;
-    }
-    printTime();
-  } 
-  else if (alarmMode) {
-    static int setStep = 0;
-    constrain(setStep, 0, 2);
-
-    if (y < 100) {
-      if (setStep == 0) {
-        alarmHour = (alarmHour + 1) % 24;
-      }
-      else if (setStep == 1) {
-        alarmMinute = (alarmMinute + 1) % 60;
-      }
-      else if (setStep == 2) {
-        alarmSecond = (alarmSecond + 1) % 60;
-      }
-      delay(300);
-    }
-
-    if (y > 900) {
-      if (setStep == 0) {
-        alarmHour = (alarmHour + 23) % 24;
-      }
-      else if (setStep == 1) {
-        alarmMinute = (alarmMinute + 59) % 60;
-      }
-      else if (setStep == 2) {
-        alarmSecond = (alarmSecond + 59) % 60;
-      }
-      delay(300);
-    }
-
-    if (x > 900) {
-      setStep++;
-      delay(300);
-    }
-    if (x < 100) {
-      setStep--;
-      delay(300);
-    }
-    if (z == LOW) {
-      alarmMode = false;
-    }
-    printTime();
-  }
-  else if(melodyMode) {
-    if (y < 100) {
-      selectedMelody = melodyList[0];
-      melodyIndex = 1;
-      lcd.clear();
-      lcd.setCursor(0,0);
-      lcd.print("Harry Potter");
-      Serial.println("멜로디 선택 완료1");
-      melodyMode = false;
-      lcd.clear();
-    }
-    if (y > 900) {
-      selectedMelody = melodyList[1];
-      melodyIndex = 2;
-      lcd.print("Merry Christmas");
-      Serial.println("멜로디 선택 완료2");
-      melodyMode = false;
-      lcd.clear();
-    }
-    saveSound();
-  }
-  else {
-    printTime();
-  }
+void loadSettings() {
+  hour = EEPROM.get(0, hour);
+  minute = EEPROM.get(sizeof(int), minute);
+  second = EEPROM.get(sizeof(int) * 2 , second);
+  alarmHour = EEPROM.get(sizeof(int) * 3, alarmHour);
+  alarmMinute = EEPROM.get(sizeof(int) * 4, alarmMinute);
+  melodyIndex = EEPROM.get(sizeof(int) * 5, melodyIndex);
 }
