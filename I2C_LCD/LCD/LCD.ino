@@ -3,7 +3,7 @@
 #include <Wire.h>
 
 // 0x3F I2C 주소를 가지고 있는 16x2 LCD객체를 생성합니다.(I2C 주소는 LCD에 맞게 수정해야 합니다.)
-LiquidCrystal_I2C lcd(0x3C, 16, 2);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // 실행시 가장 먼저 호출되는 함수이며, 최초 1회만 실행됩니다.
 // 변수를 선언하거나 초기화를 위한 코드를 포함합니다.
