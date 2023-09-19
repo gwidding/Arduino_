@@ -145,6 +145,14 @@ int lastSwitchState = HIGH;  // 이전 스위치 상태
 unsigned long lastDebounceTime = 0;  // 디바운싱을 위한 시간 기록
 unsigned long debounceDelay = 50;
 
+int states=0;
+int counts=0;
+
+unsigned long cnt=0;
+
+
+
+
 void setup() {
   lcd.init();
   lcd.backlight();
@@ -162,34 +170,78 @@ void loop() {
   int reading = digitalRead(zPin);
   Serial.println(reading);
 
-  if (digitalRead(zPin) == LOW) {
-    setMode = true;
-    alarmMode = false;
-    melodyMode = false;
-    Serial.println("시간 설정 모드 시작");
+  if (digitalRead(zPin) == LOW && counts == 0) {
+    cnt = millis();
+    counts++;
   }
-  else if (digitalRead(zPin) == LOW && !zPressed) {
-    unsigned long currentMillis = millis();
-    if (currentMillis - zPressTime < 300) {
-      if (!setMode) {
-        alarmMode = !alarmMode;
-        Serial.print("알람 모드 : ");
-        Serial.println(alarmMode);
-      }
-    }
-    else if (currentMillis - zPressTime >= 3000) {
-      if (!setMode && !alarmMode) {
-        melodyMode = !melodyMode;
-        Serial.print("멜로디 선택 모드 : ");
-        Serial.println(melodyMode);
-      }
-    }
-    zPressTime = currentMillis;
-    zPressed = true;
+  else if (millis() > cnt+500) {
+    states = counts;
+    counts = 0;
   }
-    else if (digitalRead(zPin) == HIGH) {
-      zPressed = false;
-    } 
+  else if (digitalRead(zPin) && millis() > cnt + 200) {
+    cnt = millis();
+    counts++;
+
+    if (counts >= 3) {
+      cnt = 0;
+      states = counts;
+      counts = 0;
+    }
+  }
+  switch(states) {
+    case 0:
+      break;
+    case 1:
+      setMode = true;
+      Serial.println("시간 설정 모드 켜짐");
+      break;
+    case 2:
+      alarmMode = true;
+      Serial.println("알람 설정해");
+      break;
+    case 3:
+      melodyMode = true;
+      Serial.println("소리 설정");
+      break;
+  }
+
+  if (states > 0)
+	{
+		cnt=0;
+		states=0;
+		counts=0;
+	}
+
+
+
+  // if (digitalRead(zPin) == LOW) {
+  //   setMode = true;
+  //   alarmMode = false;
+  //   melodyMode = false;
+  //   Serial.println("시간 설정 모드 시작");
+  // }
+  // else if (digitalRead(zPin) == LOW && !zPressed) {
+  //   unsigned long currentMillis = millis();
+  //   if (currentMillis - zPressTime < 300) {
+  //     if (!setMode) {
+  //       alarmMode = !alarmMode;
+  //       Serial.print("알람 모드 : ");
+  //       Serial.println(alarmMode);
+  //     }
+  //   }
+  //   else if (currentMillis - zPressTime >= 3000) {
+  //     if (!setMode && !alarmMode) {
+  //       melodyMode = !melodyMode;
+  //       Serial.print("멜로디 선택 모드 : ");
+  //       Serial.println(melodyMode);
+  //     }
+  //   }
+  //   zPressTime = currentMillis;
+  //   zPressed = true;
+  // }
+  //   else if (digitalRead(zPin) == HIGH) {
+  //     zPressed = false;
+  //   } 
 
   if (hour == alarmHour && minute == alarmMinute && second == alarmSecond) {
     playMelody();
